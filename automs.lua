@@ -1,16 +1,5 @@
 -- ======================================================
 --   PatStore - AUTO MARSHMALLOW v10 FIXED
---   Fix List:
---   - [FIX 1] MouseButton4/MouseButton5 tidak valid → diganti KeyCode.X/Z
---   - [FIX 2] Duplikasi CharacterAdded handler → digabung jadi 1
---   - [FIX 3] stepTeleport tanpa kendaraan tidak handle gracefully → ditambah fallback
---   - [FIX 4] fireproximityprompt global bisa nil → dibungkus pcall dengan getgenv check
---   - [FIX 5] Stats FPS pakai Heartbeat:Wait() blokir → pakai delta time RenderStepped
---   - [FIX 6] Radius stepper label satuan "s" → diganti "m" (meter)
---   - [FIX 7] ScrollingFrame CanvasSize auto update via UIListLayout bisa 0 → ditambah task.wait
---   - [FIX 8] antiRkJailLoop bisa overlap task.spawn → tambah guard flag
---   - [FIX 9] noclipConn tidak di-disconnect saat karakter mati → fix di CharacterAdded
---   - [FIX 10] Macro F trigger XButton1/2 → diganti KeyCode.X / KeyCode.Z (configurable)
 -- ======================================================
 
 local Players      = game:GetService("Players")
@@ -822,41 +811,6 @@ UIS.InputEnded:Connect(function(input, gp)
 		macroFHeld = false
 	end
 end)
-
--- ============================================================
--- NO CLIP SYSTEM
--- ============================================================
-local noclipEnabled = false
-local noclipConn    = nil
-
-local function setNoclip(enabled)
-	noclipEnabled = enabled
-	if enabled then
-		if noclipConn then noclipConn:Disconnect() end  -- prevent double-connect
-		noclipConn = RunService.Stepped:Connect(function()
-			local ch = player.Character
-			if not ch then return end
-			for _, part in ipairs(ch:GetDescendants()) do
-				if part:IsA("BasePart") then
-					pcall(function() part.CanCollide = false end)
-				end
-			end
-		end)
-	else
-		if noclipConn then
-			noclipConn:Disconnect()
-			noclipConn = nil
-		end
-		local ch = player.Character
-		if ch then
-			for _, part in ipairs(ch:GetDescendants()) do
-				if part:IsA("BasePart") then
-					pcall(function() part.CanCollide = true end)
-				end
-			end
-		end
-	end
-end
 
 -- ============================================================
 -- GUI HELPERS
@@ -2190,72 +2144,6 @@ do
 	RunService.Heartbeat:Connect(function()
 		macroFInterval = getMacroInterval()
 	end)
-
-	-- ── NO CLIP ────────────────────────────────────
-	line(featureScroll, 528)
-	secHdr(featureScroll, 534, "NO CLIP")
-
-	local ncWarnCard = mkFrame(featureScroll, Color3.fromRGB(20,14,8), 3)
-	ncWarnCard.Size     = UDim2.new(1, -24, 0, 46)
-	ncWarnCard.Position = UDim2.new(0, 12, 0, 552)
-	corner(ncWarnCard, 8)
-	stroke(ncWarnCard, C.orange, 1)
-
-	local ncWarnL = mkLabel(ncWarnCard, "⚠️ Melewati dinding/lantai. Gunakan dengan hati-hati di area yang aman!", C.orange, Enum.Font.Gotham, Enum.TextXAlignment.Left, 4, 9)
-	ncWarnL.Size        = UDim2.new(1, -16, 1, 0)
-	ncWarnL.Position    = UDim2.new(0, 8, 0, 0)
-	ncWarnL.TextWrapped = true
-
-	local ncTogRow = mkFrame(featureScroll, C.card, 3)
-	ncTogRow.Size     = UDim2.new(1, -24, 0, 38)
-	ncTogRow.Position = UDim2.new(0, 12, 0, 604)
-	corner(ncTogRow, 8)
-	stroke(ncTogRow, C.orange, 1.5)
-
-	local ncBarL = mkFrame(ncTogRow, C.orange, 4)
-	ncBarL.Size     = UDim2.new(0, 3, 0.6, 0)
-	ncBarL.Position = UDim2.new(0, 0, 0.2, 0)
-	corner(ncBarL, 2)
-
-	local ncL = mkLabel(ncTogRow, "👻  No Clip", C.txt, Enum.Font.GothamBold, Enum.TextXAlignment.Left, 4, 12)
-	ncL.Size = UDim2.new(0.65, 0, 1, 0)
-
-	local ncKBg = mkFrame(ncTogRow, C.line, 4)
-	ncKBg.Size     = UDim2.new(0, 34, 0, 18)
-	ncKBg.Position = UDim2.new(1, -44, 0.5, -9)
-	corner(ncKBg, 9)
-
-	local ncK = mkFrame(ncKBg, C.txt, 5)
-	ncK.Size     = UDim2.new(0, 14, 0, 14)
-	ncK.Position = UDim2.new(0, 2, 0.5, -7)
-	corner(ncK, 7)
-
-	local ncTogBtn = mkBtn(ncTogRow, "", C.txt, Enum.Font.Gotham, 5)
-	ncTogBtn.Size = UDim2.new(1, 0, 1, 0)
-	ncTogBtn.MouseButton1Click:Connect(function()
-		setNoclip(not noclipEnabled)
-		TweenService:Create(ncKBg, TweenInfo.new(0.15), {BackgroundColor3=noclipEnabled and C.orange or C.line}):Play()
-		TweenService:Create(ncK,   TweenInfo.new(0.15), {Position=noclipEnabled and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7)}):Play()
-		setStatus(noclipEnabled and "👻 No Clip aktif!" or "No Clip nonaktif.", noclipEnabled and C.orange or Color3.fromRGB(160,160,180))
-	end)
-
-	UIS.InputBegan:Connect(function(i, gp)
-		if gp then return end
-		if i.KeyCode == Enum.KeyCode.N then
-			setNoclip(not noclipEnabled)
-			TweenService:Create(ncKBg, TweenInfo.new(0.15), {BackgroundColor3=noclipEnabled and C.orange or C.line}):Play()
-			TweenService:Create(ncK,   TweenInfo.new(0.15), {Position=noclipEnabled and UDim2.new(1,-16,0.5,-7) or UDim2.new(0,2,0.5,-7)}):Play()
-			setStatus(noclipEnabled and "👻 No Clip aktif! [N]" or "No Clip nonaktif. [N]", noclipEnabled and C.orange or Color3.fromRGB(160,160,180))
-		end
-	end)
-
-	local ncHintCard = mkFrame(featureScroll, C.card, 3)
-	ncHintCard.Size     = UDim2.new(1, -24, 0, 22)
-	ncHintCard.Position = UDim2.new(0, 12, 0, 648)
-	corner(ncHintCard, 6)
-	local ncHintL = mkLabel(ncHintCard, "Shortcut: [N] untuk toggle No Clip", C.txtD, Enum.Font.Gotham, Enum.TextXAlignment.Center, 4, 9)
-	ncHintL.Size = UDim2.new(1, -8, 1, 0)
-
 end -- end FEATURE PAGE
 
 -- ============================================================
