@@ -523,7 +523,6 @@ local function moveVehicle(vehicle, targetPos)
 	end
 end
 
--- [FIX 3] stepTeleport: tambah fallback jika tidak di kendaraan
 local function stepTeleport(targetPos)
 	if isTeleporting then return end
 	local ch  = player.Character
@@ -538,7 +537,6 @@ local function stepTeleport(targetPos)
 				moveVehicle(vehicle, targetPos)
 			end
 		else
-			-- fallback: pindahkan karakter langsung (tanpa kendaraan)
 			local root = ch:FindFirstChild("HumanoidRootPart")
 			if root then
 				pcall(function()
@@ -550,21 +548,22 @@ local function stepTeleport(targetPos)
 	end)
 end
 
--- Teleport TANPA kendaraan (respawn ke titik)
+-- RESPAWN TELEPORT: mati dulu, lalu CharacterAdded langsung teleport ke tujuan
 local function respawnTeleport(targetPos)
 	if isTeleporting then return end
-	isTeleporting       = true
-	pendingRespawnPos   = targetPos
+	isTeleporting     = true
+	pendingRespawnPos = targetPos
 	setStatus("☠️ Respawn ke titik...", Color3.fromRGB(255, 160, 40))
-	task.spawn(function()
-		local ch  = player.Character
-		local hum = ch and ch:FindFirstChildOfClass("Humanoid")
-		if hum then
-			pcall(function() hum.Health = 0 end)
-		end
-		task.wait(4)
+
+	local ch  = player.Character
+	local hum = ch and ch:FindFirstChildOfClass("Humanoid")
+	if hum then
+		pcall(function() hum.Health = 0 end)
+	else
 		isTeleporting = false
-	end)
+	end
+	-- TIDAK ada task.wait di sini
+	-- Teleport ditangani langsung oleh CharacterAdded
 end
 
 local function fullyTeleport(targetPos)
@@ -579,7 +578,6 @@ local function fullyTeleport(targetPos)
 			task.wait(0.5)
 		end
 	else
-		-- fallback langsung teleport karakter
 		local root = ch:FindFirstChild("HumanoidRootPart")
 		if root then
 			pcall(function()
@@ -2515,19 +2513,27 @@ player.CharacterAdded:Connect(function(char)
 	character = char
 	hrp       = char:WaitForChild("HumanoidRootPart")
 
-	-- Handle respawn teleport
 	if pendingRespawnPos then
 		local pos         = pendingRespawnPos
 		pendingRespawnPos = nil
-		task.wait(1.5)
-		local newHRP = char:WaitForChild("HumanoidRootPart", 5)
-		if newHRP then
-			pcall(function()
-				newHRP.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-			end)
-			setStatus("✅ Teleport respawn berhasil!", Color3.fromRGB(52, 210, 110))
+		task.spawn(function()
+			local newHRP = char:WaitForChild("HumanoidRootPart", 5)
+			local hum2   = char:WaitForChild("Humanoid", 5)
+			if hum2 then
+				local t = 0
+				repeat
+					task.wait(0.05)
+					t = t + 0.05
+				until hum2:GetState() ~= Enum.HumanoidStateType.Dead or t > 3
+			end
+			if newHRP then
+				pcall(function()
+					newHRP.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+				end)
+				setStatus("✅ Teleport respawn berhasil!", Color3.fromRGB(52, 210, 110))
+			end
 			isTeleporting = false
-		end
+		end)
 	end
 
 	if fullyRunning then
@@ -2547,7 +2553,6 @@ player.CharacterAdded:Connect(function(char)
 		end)
 	end
 
-	-- [FIX 9] Re-apply noclip ke karakter baru jika masih aktif
 	if noclipEnabled then
 		if noclipConn then noclipConn:Disconnect() end
 		noclipConn = RunService.Stepped:Connect(function()
